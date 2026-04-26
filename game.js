@@ -1,162 +1,4 @@
- const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-const scoreEl = document.getElementById("score");
-
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-// 🧍 Player
-let player = {
-  x: canvas.width / 2,
-  y: canvas.height - 150,
-  health: 100,
-  punching: false,
-  punchFrame: 0
-};
-
-// 🤖 Enemies
-let enemies = [];
-let particles = [];
-let score = 0;
-let gameOver = false;
-let shake = 0;
-
-// 🎯 Controls
-canvas.addEventListener("mousemove", e => {
-  player.x = e.clientX;
-});
-
-canvas.addEventListener("click", () => {
-  player.punching = true;
-  player.punchFrame = 10;
-});
-
-// 📱 Touch
-canvas.addEventListener("touchmove", e => {
-  player.x = e.touches[0].clientX;
-});
-
-canvas.addEventListener("touchstart", () => {
-  player.punching = true;
-  player.punchFrame = 10;
-});
-
-// 🔥 Spawn enemy
-function spawnEnemy() {
-  enemies.push({
-    x: Math.random() * canvas.width,
-    y: -50,
-    health: 30,
-    speed: 2 + Math.random() * 2
-  });
-}
-setInterval(spawnEnemy, 1200);
-
-// 💥 Particles
-function createParticles(x, y) {
-  for (let i = 0; i < 15; i++) {
-    particles.push({
-      x,
-      y,
-      dx: (Math.random() - 0.5) * 6,
-      dy: (Math.random() - 0.5) * 6,
-      life: 20
-    });
-  }
-}
-
-// 🧍 Draw stickman
-function drawStickman(x, y, punching) {
-  ctx.strokeStyle = "white";
-  ctx.lineWidth = 3;
-
-  // Head
-  ctx.beginPath();
-  ctx.arc(x, y - 40, 10, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Body
-  ctx.beginPath();
-  ctx.moveTo(x, y - 30);
-  ctx.lineTo(x, y);
-  ctx.stroke();
-
-  // Arms
-  ctx.beginPath();
-  if (punching) {
-    ctx.moveTo(x, y - 20);
-    ctx.lineTo(x + 30, y - 20); // punch forward
-  } else {
-    ctx.moveTo(x, y - 20);
-    ctx.lineTo(x + 15, y - 10);
-  }
-  ctx.stroke();
-
-  // Other arm
-  ctx.beginPath();
-  ctx.moveTo(x, y - 20);
-  ctx.lineTo(x - 15, y - 10);
-  ctx.stroke();
-
-  // Legs
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x - 10, y + 20);
-  ctx.moveTo(x, y);
-  ctx.lineTo(x + 10, y + 20);
-  ctx.stroke();
-}
-
-// 🤖 Draw enemies
-function drawEnemies() {
-  enemies.forEach((e, i) => {
-    e.y += e.speed;
-
-    drawStickman(e.x, e.y, false);
-
-    // 💀 Collision with punch
-    if (player.punching) {
-      let dist = Math.abs(player.x - e.x);
-      if (dist < 40 && Math.abs(player.y - e.y) < 50) {
-        e.health -= 10;
-        createParticles(e.x, e.y);
-        shake = 10;
-      }
-    }
-
-    // Enemy hits player
-    if (Math.abs(player.x - e.x) < 20 && Math.abs(player.y - e.y) < 40) {
-      player.health -= 0.5;
-      shake = 5;
-    }
-
-    // Dead enemy
-    if (e.health <= 0) {
-      enemies.splice(i, 1);
-      score += 50;
-    }
-
-    if (e.y > canvas.height) enemies.splice(i, 1);
-  });
-}
-
-// 💥 Particles
-function drawParticles() {
-  particles.forEach((p, i) => {
-    p.x += p.dx;
-    p.y += p.dy;
-    p.life--;
-
-    ctx.fillStyle = "white";
-    ctx.fillRect(p.x, p.y, 2, 2);
-
-    if (p.life <= 0) particles.splice(i, 1);
-  });
-}
-
-// 🎥 Shake
-function applyShake() {
-  if (shake > 0) {
+// ================== SETUP ==================
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const scoreEl = document.getElementById("score");
@@ -165,30 +7,31 @@ const startBtn = document.getElementById("startBtn");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// 🎮 Game State
+// ================== GAME STATE ==================
 let gameRunning = false;
 let gameOver = false;
 let score = 0;
 let combo = 0;
-let shake = 0;
-let slowMo = 0;
+let highScore = localStorage.getItem("highScore") || 0;
 
-// 🧍 Player
+let enemies = [];
+let particles = [];
+
+let shake = 0;
+let bgOffset = 0;
+let difficulty = 1;
+
+// ================== PLAYER ==================
 let player = {
   x: canvas.width / 2,
-  y: canvas.height - 150,
+  y: canvas.height - 120,
   health: 100,
   punching: false,
   punchFrame: 0,
   rage: false
 };
 
-// 🤖 Enemies
-let enemies = [];
-let particles = [];
-let spawnRate = 1200;
-
-// 🎯 Controls
+// ================== INPUT ==================
 canvas.addEventListener("mousemove", e => {
   player.x = Math.max(50, Math.min(canvas.width - 50, e.clientX));
 });
@@ -196,12 +39,45 @@ canvas.addEventListener("mousemove", e => {
 canvas.addEventListener("click", attack);
 canvas.addEventListener("touchstart", attack);
 
+window.addEventListener("keydown", e => {
+  if (e.code === "Space") dash();
+});
+
 function attack() {
   player.punching = true;
   player.punchFrame = 10;
 }
 
-// 🔥 Spawn Enemy (with boss chance)
+function dash() {
+  player.x += (Math.random() > 0.5 ? 1 : -1) * 120;
+  shake = 20;
+}
+
+// ================== RESET ==================
+function resetGame() {
+  score = 0;
+  combo = 0;
+  difficulty = 1;
+
+  player.health = 100;
+
+  enemies = [];
+  particles = [];
+
+  gameOver = false;
+}
+
+// ================== START ==================
+startBtn.onclick = () => {
+  resetGame();
+  gameRunning = true;
+  startBtn.style.display = "none";
+
+  spawnEnemy();
+  update();
+};
+
+// ================== ENEMY ==================
 function spawnEnemy() {
   if (!gameRunning) return;
 
@@ -210,17 +86,17 @@ function spawnEnemy() {
   enemies.push({
     x: Math.random() * canvas.width,
     y: -50,
-    health: isBoss ? 200 : 30,
-    speed: isBoss ? 1 : 2 + Math.random() * 2,
+    health: isBoss ? 150 : 30,
+    speed: (2 + Math.random() * 2) * difficulty,
     boss: isBoss
   });
 
-  setTimeout(spawnEnemy, spawnRate);
+  setTimeout(spawnEnemy, 1000 / difficulty);
 }
 
-// 💥 Particles
-function createParticles(x, y, amount = 15) {
-  for (let i = 0; i < amount; i++) {
+// ================== PARTICLES ==================
+function createParticles(x, y, count = 20) {
+  for (let i = 0; i < count; i++) {
     particles.push({
       x,
       y,
@@ -231,92 +107,84 @@ function createParticles(x, y, amount = 15) {
   }
 }
 
-// 🧍 Draw Stickman
-function drawStickman(x, y, punching, boss = false) {
-  ctx.strokeStyle = boss ? "red" : "white";
-  ctx.lineWidth = boss ? 5 : 3;
+// ================== DRAW PLAYER ==================
+function drawPlayer() {
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = player.rage ? "red" : "cyan";
+
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 3;
 
   ctx.beginPath();
-  ctx.arc(x, y - 40, boss ? 20 : 10, 0, Math.PI * 2);
+  ctx.arc(player.x, player.y - 30, 10, 0, Math.PI * 2);
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.moveTo(x, y - 30);
-  ctx.lineTo(x, y);
+  ctx.moveTo(player.x, player.y - 20);
+  ctx.lineTo(player.x, player.y + 10);
   ctx.stroke();
 
+  // punch arm
   ctx.beginPath();
-  if (punching) {
-    ctx.moveTo(x, y - 20);
-    ctx.lineTo(x + 40, y - 20);
+  if (player.punching) {
+    ctx.moveTo(player.x, player.y - 10);
+    ctx.lineTo(player.x + 40, player.y - 10);
   } else {
-    ctx.moveTo(x, y - 20);
-    ctx.lineTo(x + 15, y - 10);
+    ctx.moveTo(player.x, player.y - 10);
+    ctx.lineTo(player.x + 15, player.y);
   }
   ctx.stroke();
 
-  ctx.beginPath();
-  ctx.moveTo(x, y - 20);
-  ctx.lineTo(x - 15, y - 10);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x - 10, y + 20);
-  ctx.moveTo(x, y);
-  ctx.lineTo(x + 10, y + 20);
-  ctx.stroke();
+  ctx.shadowBlur = 0;
 }
 
-// 🤖 Enemies Logic
+// ================== DRAW ENEMIES ==================
 function updateEnemies() {
   for (let i = enemies.length - 1; i >= 0; i--) {
     let e = enemies[i];
 
-    // AI: follow player
     e.x += (player.x - e.x) * 0.02;
     e.y += e.speed;
 
-    drawStickman(e.x, e.y, false, e.boss);
+    ctx.strokeStyle = e.boss ? "red" : "cyan";
+    ctx.lineWidth = e.boss ? 5 : 2;
 
-    // Punch hit
-    if (player.punching) {
-      let dist = Math.abs(player.x - e.x);
-      if (dist < 50 && Math.abs(player.y - e.y) < 60) {
-        e.health -= player.rage ? 30 : 10;
+    ctx.beginPath();
+    ctx.arc(e.x, e.y - 20, e.boss ? 15 : 8, 0, Math.PI * 2);
+    ctx.stroke();
 
-        // 💥 Effects
-        createParticles(e.x, e.y, 20);
-        shake = 15;
-        slowMo = 5;
+    // collision
+    if (player.punching &&
+        Math.abs(player.x - e.x) < 50 &&
+        Math.abs(player.y - e.y) < 60) {
 
-        // Knockback
-        e.y -= 20;
+      e.health -= player.rage ? 30 : 10;
 
-        combo++;
-      }
+      createParticles(e.x, e.y);
+      shake = 15;
+      combo++;
+
+      ctx.fillStyle = "rgba(255,255,255,0.2)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // Enemy attack
-    if (Math.abs(player.x - e.x) < 30 && Math.abs(player.y - e.y) < 50) {
+    // enemy hit
+    if (Math.abs(player.x - e.x) < 30 &&
+        Math.abs(player.y - e.y) < 50) {
       player.health -= e.boss ? 1 : 0.5;
       combo = 0;
-      shake = 10;
     }
 
-    // Death
     if (e.health <= 0) {
-      createParticles(e.x, e.y, 40);
       enemies.splice(i, 1);
-
-      score += e.boss ? 500 : 100;
+      score += e.boss ? 300 : 100;
     }
 
     if (e.y > canvas.height) enemies.splice(i, 1);
   }
 }
 
-// 💥 Particles
+// ================== PARTICLES ==================
 function updateParticles() {
   for (let i = particles.length - 1; i >= 0; i--) {
     let p = particles[i];
@@ -331,8 +199,21 @@ function updateParticles() {
   }
 }
 
-// 🎥 Effects
-function applyEffects() {
+// ================== BACKGROUND ==================
+function drawBackground() {
+  bgOffset += 2;
+
+  for (let i = 0; i < canvas.height; i += 40) {
+    ctx.strokeStyle = "rgba(0,255,255,0.1)";
+    ctx.beginPath();
+    ctx.moveTo(0, i + (bgOffset % 40));
+    ctx.lineTo(canvas.width, i + (bgOffset % 40));
+    ctx.stroke();
+  }
+}
+
+// ================== EFFECTS ==================
+function applyShake() {
   if (shake > 0) {
     ctx.translate(
       (Math.random() - 0.5) * shake,
@@ -340,33 +221,23 @@ function applyEffects() {
     );
     shake *= 0.9;
   }
-
-  if (slowMo > 0) {
-    slowMo--;
-  }
 }
 
-// 🔴 Rage Mode
-function checkRage() {
-  player.rage = player.health < 30;
-
-  if (player.rage) {
-    ctx.fillStyle = "rgba(255,0,0,0.1)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }
-}
-
-// 🔁 Game Loop
+// ================== UPDATE ==================
 function update() {
   if (!gameRunning) return;
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  applyEffects();
-  checkRage();
+  applyShake();
+  drawBackground();
 
-  drawStickman(player.x, player.y, player.punching);
+  difficulty += 0.0005;
+
+  player.rage = player.health < 30;
+
+  drawPlayer();
 
   if (player.punchFrame > 0) player.punchFrame--;
   else player.punching = false;
@@ -374,40 +245,25 @@ function update() {
   updateEnemies();
   updateParticles();
 
-  // ❤️ Death
+  // death
   if (player.health <= 0) {
-    gameOver = true;
     gameRunning = false;
-
-    ctx.fillStyle = "red";
-    ctx.font = "50px Arial";
-    ctx.fillText("YOU DIED", canvas.width / 2 - 120, canvas.height / 2);
-
     startBtn.innerText = "RESTART";
     startBtn.style.display = "block";
   }
 
   score++;
+
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem("highScore", highScore);
+  }
+
   scoreEl.innerText =
     "Score: " + score +
+    " | High: " + highScore +
     " | HP: " + Math.floor(player.health) +
     " | Combo: " + combo;
 
-  setTimeout(() => requestAnimationFrame(update), slowMo ? 60 : 16);
-}
-
-// ▶️ Start Game
-startBtn.onclick = () => {
-  player.health = 100;
-  score = 0;
-  combo = 0;
-  enemies = [];
-  particles = [];
-  gameOver = false;
-
-  gameRunning = true;
-  startBtn.style.display = "none";
-
-  spawnEnemy();
-  update();
-};
+  requestAnimationFrame(update);
+  }
